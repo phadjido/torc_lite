@@ -1,4 +1,6 @@
-# torc_liteBasic instructions:
+# torc_lite
+
+# Basic instructions:
  
 1. Make sure you have an MPI installation available on your system, preferably a thread-safe one
 
