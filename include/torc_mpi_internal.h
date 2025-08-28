@@ -10,7 +10,7 @@
 #ifndef _torc_mpi_internal_included
 #define _torc_mpi_internal_included
 
-MPI_Comm comm_out;
+extern MPI_Comm comm_out;
 
 void    enter_comm_cs();
 void    leave_comm_cs();

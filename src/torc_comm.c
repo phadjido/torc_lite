@@ -13,6 +13,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+MPI_Comm comm_out;
+
 //#define MPI_Send    MPI_Ssend
 
 pthread_mutex_t commlock = PTHREAD_MUTEX_INITIALIZER;
@@ -465,7 +467,7 @@ void torc_broadcast(void *a, long count, MPI_Datatype datatype)
 #endif
     memset(&mydata, 0, sizeof(torc_t));
     mydata.localarg[0] = (INT64) mynode;
-    mydata.localarg[1] = a;
+    mydata.localarg[1] = (INT64) a;
     mydata.localarg[2] = (INT64) count;
 #if 1
     /* yyy */
