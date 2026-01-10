@@ -567,6 +567,8 @@ int _torc_mpi2b_type(MPI_Datatype dtype)
         return T_MPI_DOUBLE_PRECISION;
     else if (dtype == MPI_INTEGER)
         return T_MPI_INTEGER;
+    else if (dtype == MPI_CHAR)
+        return T_MPI_CHAR;
     else
         Error("unsupported MPI data type");
 
@@ -594,6 +596,9 @@ MPI_Datatype _torc_b2mpi_type(int btype)
             break;
         case T_MPI_INTEGER:
             return MPI_INTEGER;
+            break;
+        case T_MPI_CHAR:
+            return MPI_CHAR;
             break;
         default:
             printf("btype = %d\n", btype);

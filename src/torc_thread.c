@@ -11,6 +11,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <math.h>
+#include <string.h>
+#include <ctype.h>
 
 
 /* External declaration from lwrte.c */
@@ -118,6 +120,28 @@ void _torc_md_init()
 }
 
 
+/* return 1 if TORC_NOEXIT is set to a “true-ish” value */
+static int torc_noexit_enabled(void)
+{
+    const char *v = getenv("TORC_NOEXIT");
+    if (!v) return 0;                 /* not set */
+    if (*v == '\0') return 1;         /* set but empty => enabled */
+
+    /* trim leading spaces */
+    while (isspace((unsigned char)*v)) v++;
+
+    /* treat 0 / false / no / off as disabled */
+    if (!strcmp(v, "0")) return 0;
+    if (!strcasecmp(v, "false")) return 0;
+    if (!strcasecmp(v, "no")) return 0;
+    if (!strcasecmp(v, "off")) return 0;
+
+    return 1; /* anything else => enabled */
+}
+
+
+
+
 void _torc_md_end ()
 {
     unsigned int i;
@@ -161,7 +185,12 @@ void _torc_md_end ()
 
         MPI_Barrier(comm_out);
         MPI_Finalize();
-        exit(0);
+
+        if (!torc_noexit_enabled()) {
+            exit(0);
+        }
+        /* else: just return to the main routine */
+        return;
     }
 }
 

@@ -63,5 +63,7 @@ int main(int argc, char *argv[])
 
     printf("Elapsed time: %.2lf seconds\n", t1-t0);
     torc_finalize();
+    printf("Goodbye\n");  /* only if TORC_NOEXIT has been set to 1 */
+
     return 0;
 }
