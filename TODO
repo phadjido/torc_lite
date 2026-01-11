@@ -1,0 +1,5 @@
+- Official documentation
+- Reorganize and cleanup code
+- Extend API to match Python futures
+- Extend examples to match Python version 
+- Enable more MPI datatypes
