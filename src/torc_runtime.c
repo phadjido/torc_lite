@@ -426,20 +426,21 @@ int _torc_scheduler_loop (int once)
         while (rte_next==NULL) {
             if (appl_finished == 1) {    /* Checking for program completion */
                 _torc_md_end();
+                return 1;
             }
 
             thread_sleep(yieldtime);
 
             rte_next = get_next_task();
             if (rte_next == NULL) {
-                if (once) return 0;
+                if (once == 1) return 0;
                 thread_sleep(yieldtime);
             }
         }
 
         /* Execute selected task */
         _torc_execute(rte_next);
-        if (once) return 1;
+        if (once == 1) return 1;
     }
 }
 

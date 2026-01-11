@@ -471,18 +471,21 @@ int torc_worker_id(void)
 
 struct torc_data *torc_data;
 
-void torc_init(int argc, char *argv[], int ms)
+int torc_init(int argc, char *argv[], int ms)
 {
     static int torc_initialized = 0;
 
-    if (torc_initialized) return;
+    if (torc_initialized) return 0;
 
     torc_initialized = 1;
 
     torc_data = calloc(1, sizeof(struct torc_data));
     _torc_opt(argc, argv);
     _torc_env_init();
-    _torc_worker(0);
+    int r;
+    r = (int)_torc_worker(0);
+    printf("torc_worker(0) returned with r=%d\n", r);
+    return r;
 }
 
 #if 1

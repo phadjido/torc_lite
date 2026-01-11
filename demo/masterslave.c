@@ -37,7 +37,15 @@ int main(int argc, char *argv[])
     torc_register_task(slave);
 
     printf("address(slave)=%p\n", slave);
-    torc_init(argc, argv, MODE_MS);
+    int r;
+    r = torc_init(argc, argv, MODE_MS);
+    if (r) {
+        printf("torc_init returned %d\n", r);
+        return 0;
+    }
+    else {
+        printf("torc_init returned %d\n", r);
+    }
 
     result = (double *)malloc(cnt*sizeof(double));
     ii = (double *)malloc(cnt*sizeof(double));

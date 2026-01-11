@@ -26,7 +26,7 @@ extern "C"
 #define MODE_MW 0
 #define MODE_MS 0
 
-void torc_init (int argc, char *argv[], int ms);
+int torc_init (int argc, char *argv[], int ms);
 void torc_reset_statistics();
 
 typedef double torc_time_t;

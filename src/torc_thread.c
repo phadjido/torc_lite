@@ -62,9 +62,9 @@ void *_torc_worker (void *arg)
     }
 
     if ((torc_node_id() == 0) && (vp_id == 0)) return 0;
-    _torc_scheduler_loop(0);    /* never returns */
+    _torc_scheduler_loop(2);    /* never returns */
 
-    return 0;
+    return 1;
 }
 
 void start_worker(long id)
@@ -186,9 +186,13 @@ void _torc_md_end ()
         MPI_Barrier(comm_out);
         MPI_Finalize();
 
+        //if (!torc_noexit_enabled() || torc_node_id() != 0) {
+        //    exit(0);
+        //}
         if (!torc_noexit_enabled()) {
             exit(0);
         }
+
         /* else: just return to the main routine */
         return;
     }
