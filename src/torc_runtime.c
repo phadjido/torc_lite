@@ -34,6 +34,37 @@
 #define A15    A14,args[14]
 #define A16    A15,args[15]
 #define A17    A16,args[16]
+#define A18    A17,args[17]
+#define A19    A18,args[18]
+#define A20    A19,args[19]
+#define A21    A20,args[20]
+#define A22    A21,args[21]
+#define A23    A22,args[22]
+#define A24    A23,args[23]
+#define A25    A24,args[24]
+#define A26    A25,args[25]
+#define A27    A26,args[26]
+#define A28    A27,args[27]
+#define A29    A28,args[28]
+#define A30    A29,args[29]
+#define A31    A30,args[30]
+#define A32    A31,args[31]
+#define A33    A32,args[32]
+#define A34    A33,args[33]
+#define A35    A34,args[34]
+#define A36    A35,args[35]
+#define A37    A36,args[36]
+#define A38    A37,args[37]
+#define A39    A38,args[38]
+#define A40    A39,args[39]
+#define A41    A40,args[40]
+#define A42    A41,args[41]
+#define A43    A42,args[42]
+#define A44    A43,args[43]
+#define A45    A44,args[44]
+#define A46    A45,args[45]
+#define A47    A46,args[46]
+#define A48    A47,args[47]
 
 #define DO_CASE(x)   \
 case x:              \
@@ -90,8 +121,39 @@ case x:              \
         DO_CASE(15);
         DO_CASE(16);
         DO_CASE(17);
+        DO_CASE(18);
+        DO_CASE(19);
+        DO_CASE(20);
+        DO_CASE(21);
+        DO_CASE(22);
+        DO_CASE(23);
+        DO_CASE(24);
+        DO_CASE(25);
+        DO_CASE(26);
+        DO_CASE(27);
+        DO_CASE(28);
+        DO_CASE(29);
+        DO_CASE(30);
+        DO_CASE(31);
+        DO_CASE(32);
+        DO_CASE(33);
+        DO_CASE(34);
+        DO_CASE(35);
+        DO_CASE(36);
+        DO_CASE(37);
+        DO_CASE(38);
+        DO_CASE(39);
+        DO_CASE(40);
+        DO_CASE(41);
+        DO_CASE(42);
+        DO_CASE(43);
+        DO_CASE(44);
+        DO_CASE(45);
+        DO_CASE(46);
+        DO_CASE(47);
+        DO_CASE(48);
         default:
-            Error("rte function with more than 17 arguments..!");
+            Error("rte function with more than 48 arguments..!");
             break;
     }
 

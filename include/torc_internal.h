@@ -28,7 +28,7 @@ typedef void          (*func_t)();
 #endif
 
 #ifndef MAX_TORC_ARGS
-#define MAX_TORC_ARGS 24
+#define MAX_TORC_ARGS 48
 #endif
 
 #include "utils.h"
