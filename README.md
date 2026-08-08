@@ -110,8 +110,3 @@ Torc‑Lite is distributed under the GNU General Public License. See `COPYING` a
 See the `AUTHORS` file for contributors and historical credits. The repository originally created by Panagiotis Hadjidoukas and collaborators.
 
 ---
-
-If you'd like, I can:
-- Replace the existing top-level `README` file with this `README.md` (or update that file instead),
-- Add a short Quick Start example that compiles and runs one of the demo programs verbatim,
-- Or open a small PR that adds usage examples and badges.
