@@ -84,6 +84,15 @@ int process_a_received_descriptor(torc_t *work/*, int tag1*/)
 
         case TORC_NORMAL_ENQUEUE:
         {
+            /*
+             * The descriptor came from another process. Its copied lock
+             * representation is not a valid local pthread mutex/spinlock.
+             */
+            memset(&work->lock, 0, sizeof(work->lock));
+            if (_lock_init(&work->lock) != 0) {
+                Error("failed to initialize received task lock");
+            }
+
             if (work->homenode == torc_node_id()) {
                 torc_to_i_rq(work);
                 reuse = 0;

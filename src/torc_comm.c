@@ -383,6 +383,15 @@ int receive_descriptor(int node, torc_t *rte)
 
     if (rte->type == TORC_NO_WORK) return 1;
 
+    /*
+     * A real task descriptor has been received through the
+     * synchronous-stealing path.
+     */
+    memset(&rte->lock, 0, sizeof(rte->lock));
+    if (_lock_init(&rte->lock) != 0) {
+        Error("failed to initialize stolen task lock");
+    }
+
     if (rte->homenode == torc_node_id()) {    /* the descriptor is stolen by its owner node */
     }
     else { /* homenode != torc_node_id() */
