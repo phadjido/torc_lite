@@ -44,15 +44,17 @@ void *_torc_worker (void *arg)
     _torc_set_vpid(vp_id);
     _torc_set_currt(rte);
 
-    int repeat;
-    while (__created < kthreads) {
+    while (1) {
+        int all_created;
+
         pthread_mutex_lock(&__m);
-        repeat = (__created < kthreads);
+        all_created = (__created >= (int)kthreads);
         pthread_mutex_unlock(&__m);
-        if (repeat)
-            thread_sleep(10);    //sched_yield();
-        else
+
+        if (all_created)
             break;
+
+        thread_sleep(10);
     }
 
     if (vp_id == 0) {

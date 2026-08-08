@@ -17,7 +17,27 @@
 
 static torc_t no_work_desc;
 
-volatile int termination_flag = 0;
+static int termination_flag = 0;
+static pthread_mutex_t termination_lock = PTHREAD_MUTEX_INITIALIZER;
+
+static int termination_requested(void)
+{
+    int value;
+
+    pthread_mutex_lock(&termination_lock);
+    value = termination_flag;
+    pthread_mutex_unlock(&termination_lock);
+
+    return value;
+}
+
+static void request_termination(void)
+{
+    pthread_mutex_lock(&termination_lock);
+    termination_flag = 1;
+    pthread_mutex_unlock(&termination_lock);
+}
+
 
 int process_a_received_descriptor(torc_t *work/*, int tag1*/)
 {
@@ -174,9 +194,9 @@ int process_a_received_descriptor(torc_t *work/*, int tag1*/)
             break;
 
         case TERMINATE_WORKER_THREADS:
-            termination_flag = 1;
+            request_termination();
             if (work->localarg[0] != torc_node_id()) {
-                appl_finished++;
+                _torc_increment_appl_finished();
             }
 #if DBG
             printf("Server %d will exit\n", torc_node_id()); fflush(0);
@@ -186,12 +206,12 @@ int process_a_received_descriptor(torc_t *work/*, int tag1*/)
             break;
 
         case ENABLE_INTERNODE_STEALING:
-            internode_stealing = 1;
+            _torc_set_internode_stealing(1);
             reuse = 1;
             break;
 
         case DISABLE_INTERNODE_STEALING:
-            internode_stealing = 0;
+            _torc_set_internode_stealing(0);
             reuse = 1;
             break;
 
@@ -265,7 +285,7 @@ void *server_loop (void *arg)
             //leave_comm_cs();
             while (1) {
                 //if (appl_finished == 1) pthread_exit(0);
-                if (termination_flag >= 1) pthread_exit(0);
+                if (termination_requested()) pthread_exit(0);
                 //enter_comm_cs();
                 MPI_Test(&request, &flag, &status);
                 //leave_comm_cs();
@@ -281,8 +301,7 @@ void *server_loop (void *arg)
             int flag = 0;
             MPI_Request request;
 
-            //            if (appl_finished == 1) {
-            if (termination_flag >= 1) {
+            if (termination_requested()) {
                 pthread_exit(0);
             }
 
@@ -291,7 +310,7 @@ void *server_loop (void *arg)
             leave_comm_cs();
             while (1) {
                 //if (appl_finished == 1) {
-                if (termination_flag >=1 ) {
+                if (termination_requested()) {
                     printf("server threads exits!\n"); fflush(0);
                     pthread_exit(0);
                 }
@@ -366,7 +385,7 @@ void shutdown_server_thread()
     if (thread_safe)
         send_descriptor(torc_node_id(), &mydata, TERMINATE_LOCAL_SERVER_THREAD);
     else
-        termination_flag = 1;
+        request_termination();
 
     pthread_join(server_thread, NULL);
 
@@ -408,7 +427,7 @@ torc_t *direct_synchronous_stealing_request(int target_node)
     int vp = target_node;
     torc_t mydata, *work;
 
-    if (termination_flag) {
+    if (termination_requested()) {
         return NULL;
     }
 
@@ -479,14 +498,14 @@ void torc_enable_stealing ()
     }
 }
 
-void torc_i_enable_stealing ()
+void torc_i_enable_stealing(void)
 {
-    internode_stealing = 1;
+    _torc_set_internode_stealing(1);
 }
 
-void torc_i_disable_stealing ()
+void torc_i_disable_stealing(void)
 {
-    internode_stealing = 0;
+    _torc_set_internode_stealing(0);
 }
 
 /*************************************************************************/

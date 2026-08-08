@@ -10,6 +10,8 @@
 #ifndef _torc_mpi_internal_included
 #define _torc_mpi_internal_included
 
+#include <stdio.h>
+
 extern MPI_Comm comm_out;
 
 void    enter_comm_cs();

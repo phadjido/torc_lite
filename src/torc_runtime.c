@@ -73,6 +73,59 @@ case x:              \
     break;           \
 }
 
+
+static pthread_mutex_t runtime_state_lock =
+    PTHREAD_MUTEX_INITIALIZER;
+
+int _torc_appl_finished(void)
+{
+    int value;
+
+    pthread_mutex_lock(&runtime_state_lock);
+    value = (int)appl_finished;
+    pthread_mutex_unlock(&runtime_state_lock);
+
+    return value;
+}
+
+void _torc_set_appl_finished(int value)
+{
+    pthread_mutex_lock(&runtime_state_lock);
+    appl_finished = (unsigned int)value;
+    pthread_mutex_unlock(&runtime_state_lock);
+}
+
+int _torc_increment_appl_finished(void)
+{
+    int value;
+
+    pthread_mutex_lock(&runtime_state_lock);
+    appl_finished++;
+    value = (int)appl_finished;
+    pthread_mutex_unlock(&runtime_state_lock);
+
+    return value;
+}
+
+int _torc_internode_stealing_enabled(void)
+{
+    int enabled;
+
+    pthread_mutex_lock(&runtime_state_lock);
+    enabled = (int)internode_stealing;
+    pthread_mutex_unlock(&runtime_state_lock);
+
+    return enabled;
+}
+
+void _torc_set_internode_stealing(int enabled)
+{
+    pthread_mutex_lock(&runtime_state_lock);
+    internode_stealing = enabled ? 1U : 0U;
+    pthread_mutex_unlock(&runtime_state_lock);
+}
+
+
 /*static*/ void _torc_core_execution (torc_t *rte)
 {
     VIRT_ADDR args[MAX_TORC_ARGS];
@@ -219,7 +272,7 @@ static void _torc_end (void)
     }
 #endif
 
-    appl_finished=1;
+    _torc_set_appl_finished(1);
     if (torc_num_nodes() > 1) {    /* notify the rest of the nodes */
         terminate_workers();
     }
@@ -443,7 +496,7 @@ torc_t *get_next_task()
             else break;
         }
 
-        if (internode_stealing) {
+        if (_torc_internode_stealing_enabled()) {
             node = (self_node + 1) % nnodes;
             while ((rte_next == NULL) && (node != self_node)) {
                 rte_next = direct_synchronous_stealing_request(node);
@@ -452,7 +505,7 @@ torc_t *get_next_task()
                 }
                 node = (node + 1) % nnodes;
             }
-            if (rte_next == NULL) internode_stealing = 0;
+            if (rte_next == NULL) _torc_set_internode_stealing(0);
         }
     }
 
@@ -506,7 +559,7 @@ int _torc_scheduler_loop (int once)
         rte_next = get_next_task();
 
         while (rte_next==NULL) {
-            if (appl_finished == 1) {    /* Checking for program completion */
+            if (_torc_appl_finished()) {  /* Checking for program completion */
                 _torc_md_end();
                 return 1;
             }
@@ -537,9 +590,11 @@ int _torc_scheduler_loop2 (int once)
         rte_next = get_next_task();
 
         while (rte_next==NULL) {
-            if (appl_finished == 1) _torc_md_end();    /* Checking for program completion */
+            if (_torc_appl_finished()) {  /* Checking for program completion */
+                _torc_md_end();
+            }
 
-                wait_count = WAIT_COUNT;
+            wait_count = WAIT_COUNT;
             while (--wait_count) {
                 //usleep(100*1000);
                 sched_yield();

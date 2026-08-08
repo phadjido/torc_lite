@@ -96,6 +96,14 @@ long    _torc_get_vpid();
 void    _torc_set_currt(torc_t *);
 torc_t *_torc_get_currt();
 
+/* Synchronized runtime-state access */
+int  _torc_appl_finished(void);
+void _torc_set_appl_finished(int value);
+int  _torc_increment_appl_finished(void);
+
+int  _torc_internode_stealing_enabled(void);
+void _torc_set_internode_stealing(int enabled);
+
 #define TORC_DEF_CPUS       1        /* Run sequentialy */
 #define TORC_DEF_YIELDTIME 10        /* 10ms default yield-time */
 
