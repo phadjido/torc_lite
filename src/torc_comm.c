@@ -42,14 +42,40 @@ struct node_info *node_info;
 /*************************************************************************/
 
 int           aslr_flag = 0;
-static int    number_of_functions = 0;
-static func_t internode_function_table[32];
+
+#define MAX_REGISTERED_TASKS 32
+
+static int number_of_functions = 0;
+static func_t internode_function_table[MAX_REGISTERED_TASKS];
 
 void torc_register_task(void *f)
 {
-    internode_function_table[number_of_functions] = (func_t) f;
-    number_of_functions++;
+    func_t task = (func_t)f;
+
+    if (task == NULL) {
+        fprintf(stderr, "TORC: cannot register a NULL task function\n");
+        abort();
+    }
+
+    /*
+     * Treat duplicate registration as successful. This keeps task IDs
+     * stable and avoids consuming table entries unnecessarily.
+     */
+    for (int i = 0; i < number_of_functions; i++) {
+        if (internode_function_table[i] == task)
+            return;
+    }
+
+    if (number_of_functions >= MAX_REGISTERED_TASKS) {
+        fprintf(stderr,
+                "TORC: task registration table is full; maximum is %d\n",
+                MAX_REGISTERED_TASKS);
+        abort();
+    }
+
+    internode_function_table[number_of_functions++] = task;
 }
+
 
 #define f77fun 1
 #if F77_FUNC_(f77fun, F77FUN) == f77fun
@@ -71,12 +97,10 @@ int getfuncnum(func_t f)
 
 func_t getfuncptr(int pos)
 {
-    /*    if (pos < 32) {*/
+    if (pos < 0 || pos >= number_of_functions)
+        return NULL;
+
     return internode_function_table[pos];
-    /*    }*/
-    /*    else {*/
-    /*        return pos;*/    /* Not registered */
-    /*    }*/
 }
 
 void check_aslr()

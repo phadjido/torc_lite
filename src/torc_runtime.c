@@ -78,8 +78,12 @@ case x:              \
     VIRT_ADDR args[MAX_TORC_ARGS];
     int i;
 
-    if (rte->work_id >= 0)
-        rte->work = getfuncptr((long)rte->work_id);
+    if (rte->work_id >= 0) {
+        rte->work = getfuncptr(rte->work_id);
+
+        if (rte->work == NULL)
+            Error1("invalid task function ID %d", rte->work_id);
+    }
 
     if (torc_node_id() == rte->homenode) {
         for (i=0; i<rte->narg; i++) {
@@ -378,6 +382,22 @@ void _torc_opt (int argc, char *argv[])
 
     MPI_Comm_rank(MPI_COMM_WORLD,&mpi_rank);
     MPI_Comm_size(MPI_COMM_WORLD,&mpi_nodes);
+
+    if (kthreads < 1 || kthreads > MAX_NVPS) {
+        fprintf(stderr,
+                "TORC: invalid worker count %u; expected 1..%d. "
+                "Check TORC_WORKERS or OMP_NUM_THREADS.\n",
+                kthreads, MAX_NVPS);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
+
+    if (mpi_nodes < 1 || mpi_nodes > MAX_NODES) {
+        fprintf(stderr,
+                "TORC: invalid MPI process count %d; expected 1..%d. "
+                "Reconfigure Torc-Lite with a larger --with-maxnodes value.\n",
+                mpi_nodes, MAX_NODES);
+        MPI_Abort(MPI_COMM_WORLD, 1);
+    }
 
     MPI_Barrier(MPI_COMM_WORLD);
 
