@@ -99,9 +99,38 @@ See `include/torc.h` for full declarations. Key functions:
 Public API is declared in `include/torc.h` and additional internal helpers live in the `include/` headers.
 
 ## Development notes
-- The runtime assumes a thread-safe MPI. If your MPI implementation is not thread-safe, consider using the `nullmpi/` stub for local testing or configure carefully.
+- For standards-compliant execution, the runtime requires `MPI_THREAD_SERIALIZED` or higher. See “Portability and MPI requirements” below for the tested Linux compatibility behavior.
 - Synchronization backend and cache-line size are determined at configure time and written to `include/ps_config.h`.
 - The main scheduler and queue logic are in `src/torc_runtime.c` and `src/torc_queue.c`.
+
+### Portability and MPI requirements
+
+#### Task-descriptor mutexes
+
+Each task descriptor contains a POSIX mutex or spinlock used for local
+dependency synchronization. Although complete task descriptors are transferred
+between MPI processes, a received lock representation is process-local state
+and must not be used directly. Torc-Lite discards and reinitializes the lock
+locally before a received task is queued or executed.
+
+Reinitializing task locks has been tested successfully on Linux. The current
+implementation primarily targets Linux POSIX environments; applications
+requiring portability to other operating systems or pthread implementations
+should verify this behavior.
+
+#### MPI thread support
+
+For standards-compliant execution, Torc-Lite requires
+`MPI_THREAD_SERIALIZED` or `MPI_THREAD_MULTIPLE`. When
+`MPI_THREAD_SERIALIZED` is provided, Torc-Lite serializes MPI calls with an
+internal communication lock.
+
+Torc-Lite has also been observed to work on Linux with Open MPI and MPICH when
+the reported level is `MPI_THREAD_SINGLE`. In that configuration, MPI calls
+remain serialized, but calls may originate from different Torc-Lite threads.
+This behavior is implementation-specific and is not guaranteed by the MPI
+standard.
+
 
 ## License
 Torc‑Lite is distributed under the GNU General Public License. See `COPYING` and `LICENSE` for the exact terms.
