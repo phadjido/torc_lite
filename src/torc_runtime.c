@@ -74,8 +74,8 @@ case x:              \
 }
 
 
-static pthread_mutex_t runtime_state_lock =
-    PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t torc_stats_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t runtime_state_lock = PTHREAD_MUTEX_INITIALIZER;
 
 int _torc_appl_finished(void)
 {
@@ -218,14 +218,24 @@ void _torc_set_internode_stealing(int enabled)
 
 void _torc_reset_statistics()
 {
+    pthread_mutex_lock(&torc_stats_lock);
+
     memset(created, 0, MAX_NVPS*sizeof(unsigned long));
     memset(executed, 0, MAX_NVPS*sizeof(unsigned long));
+
+    steal_hits = 0;
+    steal_served = 0;
+    steal_attempts = 0;
+
+    pthread_mutex_unlock(&torc_stats_lock);
 }
 
 void _torc_print_statistics()
 {
     unsigned int i;
     unsigned long total_created = 0, total_executed = 0;
+
+    pthread_mutex_lock(&torc_stats_lock);
 
     /* Runtime statistics */
     for (i = 0; i < kthreads; i++) {
@@ -239,6 +249,8 @@ void _torc_print_statistics()
         printf("%3ld,", executed[i]);
     }
     printf("%3ld)\n", executed[i]); fflush(0);
+
+    pthread_mutex_unlock(&torc_stats_lock);
 }
 
 void _torc_stats (void)
@@ -290,7 +302,9 @@ void _torc_execute (void * arg)
 
 #ifdef TORC_STATS
     if (rte->rte_type == 1) {
+        //pthread_mutex_lock(&torc_stats_lock);
         executed[vp]++;
+        //pthread_mutex_unlock(&torc_stats_lock);
     }
 #endif
 

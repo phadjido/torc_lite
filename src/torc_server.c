@@ -168,7 +168,9 @@ int process_a_received_descriptor(torc_t *work/*, int tag1*/)
 #if DBG
             printf("Server %d received request for synchronous stealing\n", torc_node_id()); fflush(0);
 #endif
+            pthread_mutex_lock(&torc_stats_lock);
             steal_attempts++;
+            pthread_mutex_unlock(&torc_stats_lock);
             stolen_work = torc_i_rq_dequeue(0);
             //        if (stolen_work == NULL) stolen_work = torc_i_rq_dequeue(1);
             for (i = 1; i < 10; i++) {
@@ -178,7 +180,9 @@ int process_a_received_descriptor(torc_t *work/*, int tag1*/)
 
             if (stolen_work != NULL) {
                 direct_send_descriptor(DIRECT_SYNCHRONOUS_STEALING_REQUEST, work->sourcenode, work->sourcevpid, stolen_work);
+                pthread_mutex_lock(&torc_stats_lock);
                 steal_served++;
+                pthread_mutex_unlock(&torc_stats_lock);
             }
             else {
                 direct_send_descriptor(DIRECT_SYNCHRONOUS_STEALING_REQUEST, work->sourcenode, work->sourcevpid, &no_work_desc);
@@ -455,7 +459,9 @@ torc_t *direct_synchronous_stealing_request(int target_node)
         return NULL;
     }
     else {
+        pthread_mutex_lock(&torc_stats_lock);
         steal_hits++;
+        pthread_mutex_unlock(&torc_stats_lock);
         return work;
     }
 }

@@ -180,7 +180,11 @@ void torc_task(int queue, void (*work)(), int narg, ...)
     rte->level      = self->level + 1;
 
 #ifdef TORC_STATS
-    if (!invisible_flag) created[self->vp_id]++;
+    if (!invisible_flag) {
+        //pthread_mutex_lock(&torc_stats_lock);
+        created[self->vp_id]++;
+        //pthread_mutex_unlock(&torc_stats_lock);
+    }
 
     if (invisible_flag) rte->rte_type = 2;    /* invisible */
 #endif
@@ -271,7 +275,9 @@ void torc_task_ex(int queue, int invisible, void (*work)(), int narg, ...)
     rte->level      = self->level + 1;
 
 #ifdef TORC_STATS
-    if (!invisible) created[self->vp_id]++;
+    if (!invisible) {
+        created[self->vp_id]++;
+    }
 
     if (invisible) rte->rte_type = 2;    /* invisible */
 #endif
@@ -576,7 +582,9 @@ void F77_FUNC_(torc_createf, TORC_CREATEF) (int *pqueue, void (* work) (), int *
     rte->level      = self->level + 1;
 
 #ifdef TORC_STATS
-    if (!invisible_flag) created[self->vp_id]++;
+    if (!invisible_flag) {
+        created[self->vp_id]++;
+    }
 
     if (invisible_flag) rte->rte_type = 2;    /* invisible */
 #endif
@@ -668,7 +676,9 @@ void F77_FUNC_(torc_taskf, TORC_TASKF) (void (* work) (), int *ptype, int *pnarg
     rte->level      = self->level + 1;
 
 #ifdef TORC_STATS
-    if ((!invisible_flag)&&(!type)) created[self->vp_id]++;
+    if ((!invisible_flag)&&(!type)) {
+        created[self->vp_id]++;
+    }
 
     if ((invisible_flag)||(type)) rte->rte_type = 2;    /* invisible */
 #endif

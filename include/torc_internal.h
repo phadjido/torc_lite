@@ -104,6 +104,8 @@ int  _torc_increment_appl_finished(void);
 int  _torc_internode_stealing_enabled(void);
 void _torc_set_internode_stealing(int enabled);
 
+extern pthread_mutex_t torc_stats_lock;
+
 #define TORC_DEF_CPUS       1        /* Run sequentialy */
 #define TORC_DEF_YIELDTIME 10        /* 10ms default yield-time */
 
