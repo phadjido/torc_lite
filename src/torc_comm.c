@@ -261,10 +261,16 @@ void send_descriptor(int node, torc_t *desc, int type)    /* always to a server 
                     free((void *)desc->temparg[i]);
                 }
                 if ((desc->callway[i] == CALL_BY_REF) || (desc->callway[i] == CALL_BY_RES)) {    /* send the result back */
+
+                    void *result = (void *)desc->temparg[i];
+                    if (result == NULL)
+                        Error("missing temporary result buffer");
+
                     enter_comm_cs();
                     MPI_Send((void *)desc->temparg[i], desc->quantity[i], desc->dtype[i], desc->homenode, tag, comm_out);
                     leave_comm_cs();
-                    if (desc->quantity[i] > 1) free((void *)desc->temparg[i]);
+                    free(result);
+                    desc->temparg[i] = 0;
                 }
             }
             return;
