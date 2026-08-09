@@ -8,6 +8,7 @@
  */
 #include <torc_internal.h>
 #include <torc.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
@@ -15,6 +16,104 @@
 #include <sys/time.h>
 
 #define f77fun  1
+
+static void validate_task_arg_count(int narg)
+{
+    if (narg < 0 || narg > MAX_TORC_ARGS) {
+        Error1("invalid number of task arguments %d", narg);
+    }
+}
+
+static void validate_task_arg_quantity(int quantity)
+{
+    if (quantity < 0) {
+        Error1("negative task argument quantity %d", quantity);
+    }
+}
+
+static int checked_mpi_type_size(MPI_Datatype dtype)
+{
+    int typesize = 0;
+    int rc = MPI_Type_size(dtype, &typesize);
+
+    if (rc != MPI_SUCCESS) {
+        Error("MPI_Type_size failed");
+        return 0;
+    }
+
+    if (typesize <= 0) {
+        Error1("invalid MPI datatype size %d", typesize);
+        return 0;
+    }
+
+    return typesize;
+}
+
+static size_t checked_argument_size(int quantity, int typesize)
+{
+    size_t count;
+    size_t size;
+
+    validate_task_arg_quantity(quantity);
+
+    if (typesize <= 0) {
+        Error1("invalid MPI datatype size %d", typesize);
+        return 0;
+    }
+
+    count = (size_t)quantity;
+    size = (size_t)typesize;
+
+    if (count > SIZE_MAX / size) {
+        Error("task argument size overflow");
+        return 0;
+    }
+
+    return count * size;
+}
+
+static void *copy_argument_buffer(VIRT_ADDR addr, int quantity,
+                                  MPI_Datatype dtype)
+{
+    int typesize = checked_mpi_type_size(dtype);
+    size_t bytes = checked_argument_size(quantity, typesize);
+    void *pmem;
+
+    if (bytes == 0) {
+        return NULL;
+    }
+
+    if (addr == 0) {
+        Error("NULL copied task argument");
+        return NULL;
+    }
+
+    pmem = malloc(bytes);
+    if (pmem == NULL) {
+        Error("failed to allocate copied task argument");
+        return NULL;
+    }
+
+    memcpy(pmem, (void *)addr, bytes);
+    return pmem;
+}
+
+static torc_t *checked_current_task_argument(int arg)
+{
+    torc_t *self = _torc_self();
+
+    if (self == NULL) {
+        Error("no current task");
+        return NULL;
+    }
+
+    if (arg < 0 || arg >= self->narg) {
+        Error1("invalid task argument index %d", arg);
+        return NULL;
+    }
+
+    return self;
+}
 
 void torc_waitall()
 {
@@ -78,6 +177,8 @@ void torc_task_detached(int queue, void (*work)(), int narg, ...)
     int i;
     torc_t * rte;
 
+    validate_task_arg_count(narg);
+
     rte = _torc_get_reused_desc();
 
     _initialize(rte);
@@ -94,12 +195,11 @@ void torc_task_detached(int queue, void (*work)(), int narg, ...)
 #endif
     rte->level      = 0;
 
-    if (narg>MAX_TORC_ARGS) Error("narg > MAX_TORC_ARGS");
-
     va_start(ap, narg);
 
     for (i=0; i<narg; i++) {
         rte->quantity[i] = va_arg(ap, int);
+        validate_task_arg_quantity(rte->quantity[i]);
         rte->dtype[i]    = va_arg(ap, MPI_Datatype);
         rte->btype[i]    = _torc_mpi2b_type(rte->dtype[i]);
         rte->callway[i]  = va_arg(ap, int);
@@ -117,15 +217,22 @@ void torc_task_detached(int queue, void (*work)(), int narg, ...)
             continue;
         }
         if (rte->callway[i] == CALL_BY_COP) {
-            int typesize;
-            MPI_Type_size(rte->dtype[i], &typesize);
+            int typesize = checked_mpi_type_size(rte->dtype[i]);
             switch (typesize) {
-                case 4:
-                    rte->localarg[i] = *va_arg (ap, INT32 *);
+                case 4: {
+                    INT32 *value = va_arg(ap, INT32 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
-                case 8:
-                    rte->localarg[i] = *va_arg (ap, INT64 *);
+                }
+                case 8: {
+                    INT64 *value = va_arg(ap, INT64 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
+                }
                 default:
                     Error("typesize not 4 or 8!");
                     break;
@@ -133,17 +240,16 @@ void torc_task_detached(int queue, void (*work)(), int narg, ...)
         }
         else if (rte->callway[i] == CALL_BY_COP2) {
             VIRT_ADDR addr = va_arg (ap, VIRT_ADDR);
-            int typesize;
-            void *pmem;
-            MPI_Type_size(rte->dtype[i], &typesize);
-            pmem = malloc(rte->quantity[i]*typesize);
-            memcpy(pmem, (void *)addr, rte->quantity[i]*typesize);
+            void *pmem = copy_argument_buffer(addr, rte->quantity[i],
+                                              rte->dtype[i]);
             rte->localarg[i] = (INT64)pmem; //yyyyyy
         }
         else {
             rte->localarg[i] = va_arg (ap, VIRT_ADDR);    /* pointer (C: PTR, VAL) */
         }
     }
+
+    va_end(ap);
 
     if (queue == -1) {
         torc_to_rq_end(rte);
@@ -159,6 +265,8 @@ void torc_task(int queue, void (*work)(), int narg, ...)
     int i;
     torc_t * rte;
     torc_t *self = _torc_self();
+
+    validate_task_arg_count(narg);
 
     /* Check if rte_init has been called */
     _lock_acquire(&self->lock);
@@ -189,12 +297,11 @@ void torc_task(int queue, void (*work)(), int narg, ...)
     if (invisible_flag) rte->rte_type = 2;    /* invisible */
 #endif
 
-    if (narg>MAX_TORC_ARGS) Error("narg > MAX_TORC_ARGS");
-
     va_start(ap, narg);
 
     for (i=0; i<narg; i++) {
         rte->quantity[i] = va_arg (ap, int);
+        validate_task_arg_quantity(rte->quantity[i]);
         rte->dtype[i]    = va_arg (ap, MPI_Datatype);
         rte->btype[i]    = _torc_mpi2b_type(rte->dtype[i]);
         rte->callway[i]  = va_arg (ap, int);
@@ -212,15 +319,22 @@ void torc_task(int queue, void (*work)(), int narg, ...)
             continue;
         }
         if (rte->callway[i] == CALL_BY_COP) {
-            int typesize;
-            MPI_Type_size(rte->dtype[i], &typesize);
+            int typesize = checked_mpi_type_size(rte->dtype[i]);
             switch (typesize) {
-                case 4:
-                    rte->localarg[i] = *va_arg (ap, INT32 *);
+                case 4: {
+                    INT32 *value = va_arg(ap, INT32 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
-                case 8:
-                    rte->localarg[i] = *va_arg (ap, INT64 *);
+                }
+                case 8: {
+                    INT64 *value = va_arg(ap, INT64 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
+                }
                 default:
                     Error("typesize not 4 or 8!");
                     break;
@@ -228,17 +342,16 @@ void torc_task(int queue, void (*work)(), int narg, ...)
         }
         else if (rte->callway[i] == CALL_BY_COP2) {
             VIRT_ADDR addr = va_arg (ap, VIRT_ADDR);
-            int typesize;
-            void *pmem;
-            MPI_Type_size(rte->dtype[i], &typesize);
-            pmem = malloc(rte->quantity[i]*typesize);
-            memcpy(pmem, (void *)addr, rte->quantity[i]*typesize);
+            void *pmem = copy_argument_buffer(addr, rte->quantity[i],
+                                              rte->dtype[i]);
             rte->localarg[i] = (INT64)pmem; //yyyyyy
         }
         else {
             rte->localarg[i] = va_arg (ap, VIRT_ADDR);    /* pointer (C: PTR, VAL) */
         }
     }
+
+    va_end(ap);
 
     if (queue == -1) {
         torc_to_rq_end(rte);
@@ -254,6 +367,8 @@ void torc_task_ex(int queue, int invisible, void (*work)(), int narg, ...)
     int i;
     torc_t * rte;
     torc_t *self = _torc_self();
+
+    validate_task_arg_count(narg);
 
     /* Check if rte_init has been called */
     _lock_acquire(&self->lock);
@@ -282,12 +397,11 @@ void torc_task_ex(int queue, int invisible, void (*work)(), int narg, ...)
     if (invisible) rte->rte_type = 2;    /* invisible */
 #endif
 
-    if (narg>MAX_TORC_ARGS) Error("narg > MAX_TORC_ARGS");
-
     va_start(ap, narg);
 
     for (i=0; i<narg; i++) {
         rte->quantity[i] = va_arg (ap, int);
+        validate_task_arg_quantity(rte->quantity[i]);
         rte->dtype[i]    = va_arg (ap, MPI_Datatype);
         rte->btype[i]    = _torc_mpi2b_type(rte->dtype[i]);
         rte->callway[i]  = va_arg (ap, int);
@@ -305,15 +419,22 @@ void torc_task_ex(int queue, int invisible, void (*work)(), int narg, ...)
             continue;
         }
         if (rte->callway[i] == CALL_BY_COP) {
-            int typesize;
-            MPI_Type_size(rte->dtype[i], &typesize);
+            int typesize = checked_mpi_type_size(rte->dtype[i]);
             switch (typesize) {
-                case 4:
-                    rte->localarg[i] = *va_arg (ap, INT32 *);
+                case 4: {
+                    INT32 *value = va_arg(ap, INT32 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
-                case 8:
-                    rte->localarg[i] = *va_arg (ap, INT64 *);
+                }
+                case 8: {
+                    INT64 *value = va_arg(ap, INT64 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
+                }
                 default:
                     Error("typesize not 4 or 8!");
                     break;
@@ -321,17 +442,16 @@ void torc_task_ex(int queue, int invisible, void (*work)(), int narg, ...)
         }
         else if (rte->callway[i] == CALL_BY_COP2) {
             VIRT_ADDR addr = va_arg (ap, VIRT_ADDR);
-            int typesize;
-            void *pmem;
-            MPI_Type_size(rte->dtype[i], &typesize);
-            pmem = malloc(rte->quantity[i]*typesize);
-            memcpy(pmem, (void *)addr, rte->quantity[i]*typesize);
+            void *pmem = copy_argument_buffer(addr, rte->quantity[i],
+                                              rte->dtype[i]);
             rte->localarg[i] = (INT64)pmem; //yyyyyy
         }
         else {
             rte->localarg[i] = va_arg (ap, VIRT_ADDR);    /* pointer (C: PTR, VAL) */
         }
     }
+
+    va_end(ap);
 
     if (queue == -1) {
         torc_to_rq_end(rte);
@@ -347,6 +467,8 @@ void torc_task_direct(int queue, void (*work)(), int narg, ...)
     int i;
     torc_t * rte;
     torc_t *self = _torc_self();
+
+    validate_task_arg_count(narg);
 
     /* Check if rte_init has been called */
     _lock_acquire(&self->lock);
@@ -367,12 +489,11 @@ void torc_task_direct(int queue, void (*work)(), int narg, ...)
     rte->parent     = self;
     rte->level      = self->level + 1;
 
-    if (narg>MAX_TORC_ARGS) Error("narg > MAX_TORC_ARGS");
-
     va_start(ap, narg);
 
     for (i=0; i<narg; i++) {
         rte->quantity[i] = va_arg (ap, int);
+        validate_task_arg_quantity(rte->quantity[i]);
         rte->dtype[i]    = va_arg (ap, MPI_Datatype);
         rte->btype[i]    = _torc_mpi2b_type(rte->dtype[i]);
         rte->callway[i]  = va_arg (ap, int);
@@ -390,15 +511,22 @@ void torc_task_direct(int queue, void (*work)(), int narg, ...)
             continue;
         }
         if (rte->callway[i] == CALL_BY_COP) {
-            int typesize;
-            MPI_Type_size(rte->dtype[i], &typesize);
+            int typesize = checked_mpi_type_size(rte->dtype[i]);
             switch (typesize) {
-                case 4:
-                    rte->localarg[i] = *va_arg (ap, INT32 *);
+                case 4: {
+                    INT32 *value = va_arg(ap, INT32 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
-                case 8:
-                    rte->localarg[i] = *va_arg (ap, INT64 *);
+                }
+                case 8: {
+                    INT64 *value = va_arg(ap, INT64 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
+                }
                 default:
                     Error("typesize not 4 or 8!");
                     break;
@@ -406,17 +534,16 @@ void torc_task_direct(int queue, void (*work)(), int narg, ...)
         }
         else if (rte->callway[i] == CALL_BY_COP2) {
             VIRT_ADDR addr = va_arg (ap, VIRT_ADDR);
-            int typesize;
-            void *pmem;
-            MPI_Type_size(rte->dtype[i], &typesize);
-            pmem = malloc(rte->quantity[i]*typesize);
-            memcpy(pmem, (void *)addr, rte->quantity[i]*typesize);
+            void *pmem = copy_argument_buffer(addr, rte->quantity[i],
+                                              rte->dtype[i]);
             rte->localarg[i] = (INT64)pmem; //yyyyyy
         }
         else {
             rte->localarg[i] = va_arg (ap, VIRT_ADDR);    /* pointer */
         }
     }
+
+    va_end(ap);
 
     if (queue == -1) {
         torc_to_rq_end(rte);
@@ -486,6 +613,12 @@ int torc_init(int argc, char *argv[], int ms)
     torc_initialized = 1;
 
     torc_data = calloc(1, sizeof(struct torc_data));
+    if (torc_data == NULL) {
+        fprintf(stderr, "TORC: failed to allocate runtime state\n");
+        torc_initialized = 0;
+        return -1;
+    }
+
     _torc_opt(argc, argv);
     _torc_env_init();
     int r;
@@ -497,7 +630,7 @@ int torc_init(int argc, char *argv[], int ms)
 #if 1
 void *torc_getarg_addr(int arg)
 {
-    torc_t *self = _torc_self();
+    torc_t *self = checked_current_task_argument(arg);
 
     if (torc_node_id() == self->homenode) {
         if (self->callway[arg] == CALL_BY_COP)
@@ -520,20 +653,19 @@ int torc_get_num_args(int arg)
 
 int torc_getarg_callway(int arg)
 {
-    return _torc_self()->callway[arg];
+    return checked_current_task_argument(arg)->callway[arg];
 }
 
 int torc_getarg_count(int arg)
 {
-    return _torc_self()->quantity[arg];
+    return checked_current_task_argument(arg)->quantity[arg];
 }
 
 int torc_getarg_size(int arg)
 {
-    int typesize;
+    torc_t *self = checked_current_task_argument(arg);
 
-    MPI_Type_size(_torc_self()->dtype[arg], &typesize);
-    return typesize;
+    return checked_mpi_type_size(self->dtype[arg]);
 }
 #endif
 
@@ -563,6 +695,8 @@ void F77_FUNC_(torc_createf, TORC_CREATEF) (int *pqueue, void (* work) (), int *
     torc_t * rte;
     torc_t *self = _torc_self();
 
+    validate_task_arg_count(narg);
+
     /* Check if rte_init has been called */
     _lock_acquire(&self->lock);
     if (self->ndep == 0) self->ndep = 1;
@@ -589,12 +723,11 @@ void F77_FUNC_(torc_createf, TORC_CREATEF) (int *pqueue, void (* work) (), int *
     if (invisible_flag) rte->rte_type = 2;    /* invisible */
 #endif
 
-    if (narg>MAX_TORC_ARGS) Error("narg > MAX_TORC_ARGS");
-
     va_start(ap, pnarg);
 
     for (i=0; i<narg; i++) {
         rte->quantity[i] = *va_arg (ap, int *);
+        validate_task_arg_quantity(rte->quantity[i]);
         MPI_Fint dt      = *va_arg (ap, MPI_Fint *);
         rte->dtype[i]    = MPI_Type_f2c(dt);
         rte->btype[i]    = _torc_mpi2b_type(rte->dtype[i]);
@@ -609,15 +742,22 @@ void F77_FUNC_(torc_createf, TORC_CREATEF) (int *pqueue, void (* work) (), int *
 
     for (i=0; i<narg; i++) {
         if (rte->callway[i] == CALL_BY_COP) {
-            int typesize;
-            MPI_Type_size(rte->dtype[i], &typesize);
+            int typesize = checked_mpi_type_size(rte->dtype[i]);
             switch (typesize) {
-                case 4:
-                    rte->localarg[i] = *va_arg (ap, INT32 *);
+                case 4: {
+                    INT32 *value = va_arg(ap, INT32 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
-                case 8:
-                    rte->localarg[i] = *va_arg (ap, INT64 *);
+                }
+                case 8: {
+                    INT64 *value = va_arg(ap, INT64 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
+                }
                 default:
                     Error("typesize not 4 or 8!");
                     break;
@@ -625,17 +765,16 @@ void F77_FUNC_(torc_createf, TORC_CREATEF) (int *pqueue, void (* work) (), int *
         }
         else if (rte->callway[i] == CALL_BY_COP2) {
             VIRT_ADDR addr = va_arg (ap, VIRT_ADDR);
-            int typesize;
-            void *pmem;
-            MPI_Type_size(rte->dtype[i], &typesize);
-            pmem = malloc(rte->quantity[i]*typesize);
-            memcpy(pmem, (void *)addr, rte->quantity[i]*typesize);
+            void *pmem = copy_argument_buffer(addr, rte->quantity[i],
+                                              rte->dtype[i]);
             rte->localarg[i] = (INT64)pmem; //yyyyyy
         }
         else {
             rte->localarg[i] = va_arg (ap, VIRT_ADDR);    /* pointer (C: PTR, VAL) */
         }
     }
+
+    va_end(ap);
 
     if (queue == -1) {
         torc_to_rq_end(rte);
@@ -656,6 +795,8 @@ void F77_FUNC_(torc_taskf, TORC_TASKF) (void (* work) (), int *ptype, int *pnarg
     int i;
     torc_t * rte;
     torc_t *self = _torc_self();
+
+    validate_task_arg_count(narg);
 
     /* Check if rte_init has been called */
     _lock_acquire(&self->lock);
@@ -683,12 +824,11 @@ void F77_FUNC_(torc_taskf, TORC_TASKF) (void (* work) (), int *ptype, int *pnarg
     if ((invisible_flag)||(type)) rte->rte_type = 2;    /* invisible */
 #endif
 
-    if (narg>MAX_TORC_ARGS) Error("narg > MAX_TORC_ARGS");
-
     va_start(ap, pnarg);
 
     for (i=0; i<narg; i++) {
         rte->quantity[i] = *va_arg (ap, int *);
+        validate_task_arg_quantity(rte->quantity[i]);
         MPI_Fint dt      = *va_arg (ap, MPI_Fint *);
         rte->dtype[i]    = MPI_Type_f2c(dt);
         rte->btype[i]    = _torc_mpi2b_type(rte->dtype[i]);
@@ -703,15 +843,22 @@ void F77_FUNC_(torc_taskf, TORC_TASKF) (void (* work) (), int *ptype, int *pnarg
 
     for (i=0; i<narg; i++) {
         if (rte->callway[i] == CALL_BY_COP) {
-            int typesize;
-            MPI_Type_size(rte->dtype[i], &typesize);
+            int typesize = checked_mpi_type_size(rte->dtype[i]);
             switch (typesize) {
-                case 4:
-                    rte->localarg[i] = *va_arg (ap, INT32 *);
+                case 4: {
+                    INT32 *value = va_arg(ap, INT32 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
-                case 8:
-                    rte->localarg[i] = *va_arg (ap, INT64 *);
+                }
+                case 8: {
+                    INT64 *value = va_arg(ap, INT64 *);
+                    if (value == NULL)
+                        Error("NULL scalar task argument");
+                    rte->localarg[i] = *value;
                     break;
+                }
                 default:
                     Error("typesize not 4 or 8!");
                     break;
@@ -719,17 +866,16 @@ void F77_FUNC_(torc_taskf, TORC_TASKF) (void (* work) (), int *ptype, int *pnarg
         }
         else if (rte->callway[i] == CALL_BY_COP2) {
             VIRT_ADDR addr = va_arg (ap, VIRT_ADDR);
-            int typesize;
-            void *pmem;
-            MPI_Type_size(rte->dtype[i], &typesize);
-            pmem = malloc(rte->quantity[i]*typesize);
-            memcpy(pmem, (void *)addr, rte->quantity[i]*typesize);
+            void *pmem = copy_argument_buffer(addr, rte->quantity[i],
+                                              rte->dtype[i]);
             rte->localarg[i] = (INT64)pmem; //yyyyyy
         }
         else {
             rte->localarg[i] = va_arg (ap, VIRT_ADDR);    /* pointer (C: PTR, VAL) */
         }
     }
+
+    va_end(ap);
 
     if (queue == -1) {
         torc_to_rq_end(rte);
