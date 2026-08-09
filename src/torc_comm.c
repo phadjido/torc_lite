@@ -242,6 +242,11 @@ void send_descriptor(int node, torc_t *desc, int type)    /* always to a server 
 #if DBG
     printf("[%d] - sending to node [%d] desc -> homenode [%d], type = %d\n", torc_node_id(), node, desc->homenode, type);
 #endif
+
+    if (type == TORC_NORMAL_ENQUEUE && node != torc_node_id() && desc->work_id < 0) {
+        Error1("cannot send unregistered task function %p", desc->work);
+    }
+
     desc->sourcenode = torc_node_id();
     desc->sourcevpid = tag;    /* who sends this */
     desc->type       = type;

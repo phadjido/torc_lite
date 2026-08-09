@@ -131,6 +131,17 @@ void _torc_set_internode_stealing(int enabled)
     VIRT_ADDR args[MAX_TORC_ARGS];
     int i;
 
+    if (torc_node_id() != rte->homenode && rte->work_id < 0) {
+        Error("received an unregistered remote task");
+    }
+
+    if (rte->work_id >= 0) {
+        rte->work = getfuncptr(rte->work_id);
+
+        if (rte->work == NULL)
+            Error1("invalid task function ID %d", rte->work_id);
+    }
+
     if (rte->work_id >= 0) {
         rte->work = getfuncptr(rte->work_id);
 

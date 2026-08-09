@@ -98,6 +98,13 @@ See `include/torc.h` for full declarations. Key functions:
 
 Public API is declared in `include/torc.h` and additional internal helpers live in the `include/` headers.
 
+Functions that may execute on another MPI process must be registered with
+`torc_register_task()` on every MPI process. Tasks must be registered in the
+same order on every process because the runtime transfers registered-function
+IDs between processes. Unregistered functions may only be used for tasks that
+are guaranteed to execute locally.
+
+
 ## Development notes
 - For standards-compliant execution, the runtime requires `MPI_THREAD_SERIALIZED` or higher. See “Portability and MPI requirements” below for the tested Linux compatibility behavior.
 - Synchronization backend and cache-line size are determined at configure time and written to `include/ps_config.h`.
