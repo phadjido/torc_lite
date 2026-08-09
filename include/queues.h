@@ -82,6 +82,11 @@ typedef union _##queue_type {             \
 }
 
 
+/* A deliberate lock-elision optimization that works
+ * as a best-effort queue hint on tested platforms,
+ * but is not formally data-race-free under the C memory model.
+ */
+
 #define _dequeue(_q, _thread) {                \
     if ((_q)->q.head != NULL) {                \
         _lock_acquire(&(_q)->q.lock);          \
