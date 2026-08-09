@@ -17,6 +17,7 @@
 
 #define f77fun  1
 
+/* new functions for validation of task arguments */
 static void validate_task_arg_count(int narg)
 {
     if (narg < 0 || narg > MAX_TORC_ARGS) {
