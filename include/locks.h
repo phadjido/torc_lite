@@ -40,7 +40,7 @@ typedef pthread_mutex_t _lock_t;
 #if defined(POSIX_MUTEX_LOCK)
 #define _lock_acquire(var)        pthread_mutex_lock(var)
 #elif defined(POSIX_MUTEX_TRYLOCK)
-static int _lock_acquire(_lock_t * lock)
+static inline int _lock_acquire(_lock_t * lock)
 {
     /* Yield the processor to another thread or process. */
     while (pthread_mutex_trylock(lock) == EBUSY)

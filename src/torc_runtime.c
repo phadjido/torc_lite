@@ -304,7 +304,7 @@ void _torc_execute (void * arg)
 int _torc_block (void)
 {
     torc_t *rte = _torc_self();
-    int self = rte->vp_id;
+    //int self = rte->vp_id;
     int remdeps;
 
     _lock_acquire (&rte->lock);
@@ -329,7 +329,7 @@ int _torc_block (void)
 int _torc_block2 (void)
 {
     torc_t *rte = _torc_self();
-    int self = rte->vp_id;
+    //int self = rte->vp_id;
     int remdeps;
 
     _lock_acquire (&rte->lock);
@@ -455,7 +455,7 @@ void _torc_opt (int argc, char *argv[])
     MPI_Barrier(MPI_COMM_WORLD);
 
 #if 1
-    int size, namelen;
+    int namelen;
     char name[MPI_MAX_PROCESSOR_NAME];
     MPI_Get_processor_name (name, &namelen);
     printf("TORC_LITE ... rank %d of %d on host %s\n", mpi_rank, mpi_nodes, name);
@@ -484,9 +484,9 @@ torc_t *get_next_task()
     int self_node = torc_node_id();
     int nnodes = torc_num_nodes();
     torc_t *rte_next = NULL;
-    int vp;
+    //int vp;
     int node;
-    int self = torc_i_worker_id();
+    //int self = torc_i_worker_id();
 
     rte_next = torc_i_pq_dequeue ();
     if (rte_next == NULL) {
@@ -552,7 +552,7 @@ void _torc_cleanup(torc_t *rte)
 
 int _torc_scheduler_loop (int once)
 {
-    int self = torc_i_worker_id();
+    //int self = torc_i_worker_id();
     torc_t * rte_next;
 
     while (1) {
@@ -583,7 +583,7 @@ int _torc_scheduler_loop (int once)
 int _torc_scheduler_loop2 (int once)
 {
     int wait_count;
-    int self = torc_i_worker_id();
+    //int self = torc_i_worker_id();
     torc_t * rte_next;
 
     while (1) {

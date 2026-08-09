@@ -483,7 +483,7 @@ int torc_init(int argc, char *argv[], int ms)
     _torc_opt(argc, argv);
     _torc_env_init();
     int r;
-    r = (int)_torc_worker(0);
+    r = (int)(intptr_t)_torc_worker(0);
     printf("torc_worker(0) returned with r=%d\n", r);
     return r;
 }

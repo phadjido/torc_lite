@@ -63,10 +63,10 @@ void *_torc_worker (void *arg)
         leave_comm_cs();
     }
 
-    if ((torc_node_id() == 0) && (vp_id == 0)) return 0;
+    if ((torc_node_id() == 0) && (vp_id == 0)) return (void *)0;
     _torc_scheduler_loop(2);    /* never returns */
 
-    return 1;
+    return (void *)1;
 }
 
 void start_worker(long id)
@@ -102,7 +102,6 @@ static int active_workers;
 void _torc_md_init()
 {
     unsigned int i;
-    int this_node = torc_node_id();
 
     pthread_key_create(&vp_key, NULL);
     pthread_key_create(&currt_key, NULL);
@@ -111,10 +110,7 @@ void _torc_md_init()
         start_server_thread();
     }
 
-/*    node_info[this_node].nworkers = 1;*/
-    //pthread_barrier_init(&bar, NULL, kthreads);
     for (i = 1; i<kthreads; i++) {
-/*        node_info[this_node].nworkers++;*/
         start_worker((long)i);
     }
 
@@ -146,9 +142,7 @@ static int torc_noexit_enabled(void)
 
 void _torc_md_end ()
 {
-    unsigned int i;
     unsigned int my_vp;
-    int res;
 
     my_vp = _torc_get_vpid();
 #if DBG
@@ -188,9 +182,6 @@ void _torc_md_end ()
         MPI_Barrier(comm_out);
         MPI_Finalize();
 
-        //if (!torc_noexit_enabled() || torc_node_id() != 0) {
-        //    exit(0);
-        //}
         if (!torc_noexit_enabled()) {
             exit(0);
         }

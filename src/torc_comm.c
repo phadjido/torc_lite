@@ -307,9 +307,9 @@ void direct_send_descriptor(int dummy, int sourcenode, int sourcevpid, torc_t *d
 void receive_arguments(torc_t *work, int tag)
 {
     int typesize;
+    //int istat;
     char *mem;
     MPI_Status status;
-    int istat;
 
     for (int i = 0; i < work->narg; i++) {
 #if DBG
@@ -317,7 +317,6 @@ void receive_arguments(torc_t *work, int tag)
 #endif
         if (work->quantity[i] == 0) continue;
         if ((work->quantity[i] > 1)||((work->callway[i] != CALL_BY_COP)&&(work->callway[i] != CALL_BY_VAD))) {
-
 #if 1
             /* yyy */
             work->dtype[i] = _torc_b2mpi_type(work->btype[i]);
@@ -340,7 +339,8 @@ void receive_arguments(torc_t *work, int tag)
             if ((work->callway[i] != CALL_BY_RES)) {    /* CALL_BY_REF etc */
                 //xxx  if (work->quantity[i] == 1) { printf("WHY (%d)???\n", i); fflush(0); }
                 enter_comm_cs();
-                istat = MPI_Recv((void *)work->temparg[i], work->quantity[i], work->dtype[i], work->sourcenode, tag, comm_out, &status);
+                //istat =
+                MPI_Recv((void *)work->temparg[i], work->quantity[i], work->dtype[i], work->sourcenode, tag, comm_out, &status);
                 leave_comm_cs();
             }
             else if (work->callway[i] == CALL_BY_RES) {

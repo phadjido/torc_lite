@@ -42,10 +42,10 @@ static void request_termination(void)
 int process_a_received_descriptor(torc_t *work/*, int tag1*/)
 {
     int reuse = 0;
-    torc_t *stolen_work, *parent;
+    torc_t *stolen_work; // *parent;
     MPI_Status status;
-    int i, istat, tag;
-    char *mem;
+    int i, tag;  // istat;
+    //char *mem;
 
     work->next = NULL;
 
@@ -77,7 +77,7 @@ int process_a_received_descriptor(torc_t *work/*, int tag1*/)
                     /* yyy */
                     work->dtype[i] = _torc_b2mpi_type(work->btype[i]);
 #endif
-                    istat = MPI_Recv((void *)work->localarg[i], work->quantity[i], work->dtype[i], work->sourcenode, tag, comm_out, &status);
+                    /*istat = */MPI_Recv((void *)work->localarg[i], work->quantity[i], work->dtype[i], work->sourcenode, tag, comm_out, &status);
                     leave_comm_cs();
                 }
 #if DBG
@@ -232,7 +232,7 @@ int process_a_received_descriptor(torc_t *work/*, int tag1*/)
 
             printf("TORC_BCAST: %p %d\n", va, count); fflush(0);
             enter_comm_cs();
-            istat = MPI_Recv((void *)va, count, dtype, work->sourcenode, tag, comm_out, &status);
+            /*istat = */MPI_Recv((void *)va, count, dtype, work->sourcenode, tag, comm_out, &status);
             leave_comm_cs();
             reuse = 1;
         }
@@ -256,7 +256,7 @@ void *server_loop (void *arg)
     torc_t *work;
     int reuse = 0;
     MPI_Status status;
-    int istat;
+    //int istat;
 
 #if DBG
     printf("Server %d begins....\n", torc_node_id()); fflush(stdout);
@@ -275,13 +275,13 @@ void *server_loop (void *arg)
         if (thread_safe) {
             //#define _MONTE_ROSA_
 #if !defined(_MONTE_ROSA_)
-            istat = MPI_Recv(work, torc_desc_size, MPI_CHAR, MPI_ANY_SOURCE, MAX_NVPS, comm_out, &status);
+            /*istat = */MPI_Recv(work, torc_desc_size, MPI_CHAR, MPI_ANY_SOURCE, MAX_NVPS, comm_out, &status);
 #else
             int flag = 0;
             MPI_Request request;
 
             //enter_comm_cs();
-            istat = MPI_Irecv(work, torc_desc_size, MPI_CHAR, MPI_ANY_SOURCE, MAX_NVPS, comm_out, &request);
+            /*istat = */MPI_Irecv(work, torc_desc_size, MPI_CHAR, MPI_ANY_SOURCE, MAX_NVPS, comm_out, &request);
             //leave_comm_cs();
             while (1) {
                 //if (appl_finished == 1) pthread_exit(0);
@@ -306,7 +306,7 @@ void *server_loop (void *arg)
             }
 
             enter_comm_cs();
-            istat = MPI_Irecv(work, torc_desc_size, MPI_CHAR, MPI_ANY_SOURCE, MAX_NVPS, comm_out, &request);
+            /*istat = */MPI_Irecv(work, torc_desc_size, MPI_CHAR, MPI_ANY_SOURCE, MAX_NVPS, comm_out, &request);
             leave_comm_cs();
             while (1) {
                 //if (appl_finished == 1) {
