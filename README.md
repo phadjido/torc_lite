@@ -88,13 +88,16 @@ mpicc `./scripts/torc_cflags` -o myprog myprog.c `./scripts/torc_libs`
 ```
 
 ## API quick reference
+
 See `include/torc.h` for full declarations. Key functions:
-- `int torc_init(int argc, char *argv[], int ms);` — initialize runtime
-- `void torc_task(int queue, void (*f)(), int narg, ...);` — create a task
-- `void torc_task_detached(...)`, `torc_task_ex(...)`, `torc_task_direct(...)` — variants
-- `void torc_waitall();` — wait for outstanding tasks
-- `void torc_finalize();` — shut down runtime
-- `void torc_broadcast(void *a, long count, MPI_Datatype dtype);` — helper for broadcasting data
+
+- `int torc_init(int argc, char *argv[], int ms);` — initialize the runtime.
+- `void torc_task(int queue, void (*f)(), int narg, ...);` — create a task. `torc_create()` is an alias for this function.
+- `torc_task_detached()`, `torc_task_ex()`, and `torc_task_direct()` — task-creation variants.
+- `void torc_waitall(void);` — wait for outstanding child tasks.
+- `void torc_finalize(void);` — shut down the runtime.
+- `void torc_broadcast(void *a, long count, MPI_Datatype dtype);` — broadcast data to the MPI processes.
+
 
 Public API is declared in `include/torc.h` and additional internal helpers live in the `include/` headers.
 
@@ -103,6 +106,50 @@ Functions that may execute on another MPI process must be registered with
 same order on every process because the runtime transfers registered-function
 IDs between processes. Unregistered functions may only be used for tasks that
 are guaranteed to execute locally.
+
+
+### Creating tasks
+
+`torc_create()` creates an asynchronous child task and is an alias for
+`torc_task()`:
+
+```c
+torc_create(queue, function, narg,
+            count_0, datatype_0, mode_0,
+            count_1, datatype_1, mode_1,
+            /* ... */
+            address_0, address_1 /* ... */);
+```
+
+- queue is a global worker ID, or `-1` to let Torc-Lite select a worker.
+- narg is the number of task arguments. Each argument is first described by
+its element count, MPI datatype, and passing mode. The addresses of all
+arguments follow the complete list of argument descriptions.
+- The principal passing modes are:
+    - `CALL_BY_COP` (`IN`): copy the input when the task is created.
+    - `CALL_BY_REF` (`INOUT`): pass the original memory locally, or transfer the
+input and copy the updated value back after remote execution.
+    - `CALL_BY_RES` (`OUT`): write directly to the original memory locally, or
+copy the result back after remote execution.
+    - `CALL_BY_PTR` (`IN`): provide pointer-based input without copying changes
+back.
+
+Example:
+
+```c
+torc_create(-1, slave, 2,
+            1, MPI_DOUBLE, CALL_BY_COP,
+            1, MPI_DOUBLE, CALL_BY_RES,
+            &input, &result);
+
+torc_waitall();
+```
+
+Functions that may execute on another MPI process must be registered with
+torc_register_task() on every process and in the same order. Memory passed
+with CALL_BY_REF or CALL_BY_RES must remain valid until the task completes.
+After torc_waitall() returns, all child tasks have completed and their
+outputs have been written to the supplied memory.
 
 
 ## Development notes
@@ -138,12 +185,6 @@ remain serialized, but calls may originate from different Torc-Lite threads.
 This behavior is implementation-specific and is not guaranteed by the MPI
 standard.
 
-
-## License
-Torc‑Lite is distributed under the GNU General Public License. See `COPYING` and `LICENSE` for the exact terms.
-
-## Authors / Contact
-See the `AUTHORS` file for contributors and historical credits. The repository originally created by Panagiotis Hadjidoukas and collaborators.
 
 ---
 
@@ -226,5 +267,13 @@ mpirun -np 4 ./masterslave_example
 ```
 
 Notes:
+
 - The demos in `demo/` provide several more complete examples (async, broadcast, fibo, pipe, etc.).
-- See `include/torc.h` for detailed API usage and the demos for realistic patterns and argument passing modes (CALL_BY_COP, CALL_BY_RES, CALL_BY_REF).
+- See `include/torc.h` for detailed API usage and the demos for realistic patterns and argument passing modes (`CALL_BY_COP`, `CALL_BY_RES`, `CALL_BY_REF`).
+
+
+## License
+Torc‑Lite is distributed under the GNU General Public License. See `COPYING` and `LICENSE` for the exact terms.
+
+## Authors / Contact
+See the `AUTHORS` file for contributors and historical credits. The repository originally created by Panagiotis Hadjidoukas and collaborators.
